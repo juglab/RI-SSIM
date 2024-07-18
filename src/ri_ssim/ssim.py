@@ -1,34 +1,87 @@
+"""Calculate the elemnts used for computing the SSIM.
+
+Code adapted from `skimage.metrics.structural_similarity` under BSD-3-Clause license.
+See https://github.com/scikit-image/scikit-image.
 """
-Structural similarity index code adapted from skimage.metrics.structural_similarity
-"""
+
+from dataclasses import dataclass
+from typing import Optional
 
 import numpy as np
+from numpy.typing import NDArray
 from scipy.ndimage import uniform_filter
-
 from skimage._shared.filters import gaussian
 from skimage._shared.utils import _supported_float_type, check_shape_equality, warn
 from skimage.util.dtype import dtype_range
 
 
-def structural_similarity_dict(
-    img_x,
-    img_y,
+@dataclass
+class SSIM:
+    """Dataclass holding the various values necessary for the computation of the
+    SSIM."""
+
+    ux: NDArray
+    """Weighted mean of the first image."""
+
+    uy: NDArray
+    """Weighted mean of the second image."""
+
+    vxy: NDArray
+    """Weighted covariance of the two images."""
+
+    vx: NDArray
+    """Weighted variance of the first image."""
+
+    vy: NDArray
+    """Weighted variance of the second image."""
+
+    C1: float
+    """Algorithm parameter, C1."""
+
+    C2: float
+    """Algorithm parameter, C2."""
+
+    C3: Optional[float] = None
+    """Algorithm parameter, C3."""
+
+    SSIM: Optional[float] = None
+    """The SSIM value."""
+
+    luminance: Optional[float] = None
+    """The luminance value."""
+
+    contrast: Optional[float] = None
+    """The contrast value."""
+
+    structure: Optional[float] = None
+    """The structure value."""
+
+    alpha: Optional[float] = None
+    """The range-invariant factor."""
+
+
+def compute_ssim_elements(
+    img_x: NDArray,
+    img_y: NDArray,
     *,
-    win_size=None,
-    data_range=None,
-    channel_axis=None,
-    gaussian_weights=False,
-    return_contrast_sensitivity=False,
-    **kwargs,
-):
+    win_size: Optional[int] = None,
+    data_range: Optional[float] = None,
+    channel_axis: Optional[int] = None,
+    gaussian_weights: bool = False,
+    **kwargs: dict[str, float],
+) -> SSIM:
     """
-    Compute the mean structural similarity index between two images.
-    Please pay attention to the `data_range` parameter with floating-point images.
+    Calculate the elemnts used for computing the SSIM.
+
+    Code adapted from `skimage.metrics.structural_similarity` under BSD-3-Clause
+    license.
 
     Parameters
     ----------
-    img_x, img_y : ndarray
-        Images. Any dimensionality with same shape.
+    img_x : numpy.ndarray
+        First image being compared.
+    img_y : numpy.ndarray
+        Second image being compared.
     win_size : int or None, optional
         The side-length of the sliding window used in comparison. Must be an
         odd value. If `gaussian_weights` is True, this is ignored and the
@@ -45,14 +98,9 @@ def structural_similarity_dict(
         If None, the image is assumed to be a grayscale (single channel) image.
         Otherwise, this parameter indicates which axis of the array corresponds
         to channels.
-
-        .. versionadded:: 0.19
-           ``channel_axis`` was added in 0.19.
     gaussian_weights : bool, optional
         If True, each patch has its mean and variance spatially weighted by a
         normalized Gaussian kernel of width sigma=1.5.
-    full : bool, optional
-        If True, also return the full structural similarity image.
 
     Other Parameters
     ----------------
@@ -68,49 +116,8 @@ def structural_similarity_dict(
 
     Returns
     -------
-    mssim : float
-        The mean structural similarity index over the image.
-    grad : ndarray
-        The gradient of the structural similarity between im1 and im2 [2]_.
-        This is only returned if `gradient` is set to True.
-    S : ndarray
-        The full SSIM image.  This is only returned if `full` is set to True.
-
-    Notes
-    -----
-    If `data_range` is not specified, the range is automatically guessed
-    based on the image data type. However for floating-point image data, this
-    estimate yields a result double the value of the desired range, as the
-    `dtype_range` in `skimage.util.dtype.py` has defined intervals from -1 to
-    +1. This yields an estimate of 2, instead of 1, which is most often
-    required when working with image data (as negative light intensities are
-    nonsensical). In case of working with YCbCr-like color data, note that
-    these ranges are different per channel (Cb and Cr have double the range
-    of Y), so one cannot calculate a channel-averaged SSIM with a single call
-    to this function, as identical ranges are assumed for each channel.
-
-    To match the implementation of Wang et al. [1]_, set `gaussian_weights`
-    to True, `sigma` to 1.5, `use_sample_covariance` to False, and
-    specify the `data_range` argument.
-
-    .. versionchanged:: 0.16
-        This function was renamed from ``skimage.measure.compare_ssim`` to
-        ``skimage.metrics.structural_similarity``.
-
-    References
-    ----------
-    .. [1] Wang, Z., Bovik, A. C., Sheikh, H. R., & Simoncelli, E. P.
-       (2004). Image quality assessment: From error visibility to
-       structural similarity. IEEE Transactions on Image Processing,
-       13, 600-612.
-       https://ece.uwaterloo.ca/~z70wang/publications/ssim.pdf,
-       :DOI:`10.1109/TIP.2003.819861`
-
-    .. [2] Avanaki, A. N. (2009). Exact global histogram specification
-       optimized for structural similarity. Optical Review, 16, 613-621.
-       :arxiv:`0901.0065`
-       :DOI:`10.1007/s10043-009-0119-z`
-
+    SSIMElements dataclass
+        The elements used for computing the SSIM (means, variances, covariaces, etc.).
     """
     check_shape_equality(img_x, img_y)
     float_type = _supported_float_type(img_x.dtype)
@@ -121,7 +128,7 @@ def structural_similarity_dict(
             "Please set `channel_axis` to None."
         )
 
-    K1 = kwargs.pop("K1", 0.01)
+    K1 = kwargs.pop("K1", 0.01)  # TODO inherited from skimage, but might make explicit
     K2 = kwargs.pop("K2", 0.03)
     K3 = kwargs.pop("K3", None)
 
@@ -174,7 +181,8 @@ def structural_similarity_dict(
             )
         if img_x.dtype != img_y.dtype:
             warn(
-                "Inputs have mismatched dtypes. Setting data_range based on img_x.dtype.",
+                "Inputs have mismatched dtypes. Setting data_range "
+                "based on img_x.dtype.",
                 stacklevel=2,
             )
         dmin, dmax = dtype_range[img_x.dtype.type]
@@ -231,46 +239,14 @@ def structural_similarity_dict(
     vxy = vxy[pad:-pad, pad:-pad].copy()
     vx = vx[pad:-pad, pad:-pad].copy()
     vy = vy[pad:-pad, pad:-pad].copy()
-    return {
-        "ux": ux,
-        "uy": uy,
-        "vxy": vxy,
-        "vx": vx,
-        "vy": vy,
-        "C1": C1,
-        "C2": C2,
-        "C3": C3,
-    }
 
-    # A1, A2, B1, B2 = (
-    #     2 * ux * uy + C1,
-    #     2 * vxy + C2,
-    #     ux**2 + uy**2 + C1,
-    #     vx + vy + C2,
-    # )
-
-    # D = B1 * B2
-    # S = (A1 * A2) / D
-
-    # # to avoid edge effects will ignore filter radius strip around edges
-    # pad = (win_size - 1) // 2
-
-    # # compute (weighted) mean of ssim. Use float64 for accuracy.
-    # mssim = crop(S, pad).mean(dtype=np.float64)
-
-    # if gradient:
-    #     # The following is Eqs. 7-8 of Avanaki 2009.
-    #     grad = filter_func(A1 / D, **filter_args) * im1
-    #     grad += filter_func(-S / B2, **filter_args) * img_y
-    #     grad += filter_func((ux * (A2 - A1) - uy * (B2 - B1) * S) / D, **filter_args)
-    #     grad *= 2 / im1.size
-
-    #     if full:
-    #         return mssim, grad, S
-    #     else:
-    #         return mssim, grad
-    # else:
-    #     if full:
-    #         return mssim, S
-    #     else:
-    #         return mssim
+    return SSIM(
+        ux=ux,
+        uy=uy,
+        vxy=vxy,
+        vx=vx,
+        vy=vy,
+        C1=C1,
+        C2=C2,
+        C3=C3,
+    )
