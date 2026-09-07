@@ -40,7 +40,7 @@ dependencies = [
     "numpy>=1.21,<3.0.0",
     "scipy<=1.17.1",
     "scikit-image<=0.26.0",
-    "torch>=2.5,<=2.13.0",
+    "torch>=2.5,<=2.14.0",
     "torchmetrics<=1.8.2",
     "tqdm<=4.70.0",
 ]
