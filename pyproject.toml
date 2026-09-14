@@ -42,7 +42,7 @@ dependencies = [
     "scikit-image<=0.26.0",
     "torch>=2.5,<=2.14.0",
     "torchmetrics<=1.8.2",
-    "tqdm<=4.70.0",
+    "tqdm<=4.70.1",
 ]
 
 [project.optional-dependencies]
